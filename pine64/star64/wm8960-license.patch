@@ -1,0 +1,24 @@
+From 6e4a45c559baf42260bf834067b70fc7a0aca414 Mon Sep 17 00:00:00 2001
+From: Francesco Gazzetta <fgaz@fgaz.me>
+Date: Thu, 22 Jun 2023 06:28:48 +0000
+Subject: [PATCH] ASoC: wm8960: restore missing MODULE_LICENSE
+
+Accidentally removed in edd12a5579cb4f1a7a7ae5ceb50997df81c411b5
+
+Signed-off-by: Francesco Gazzetta <fgaz@fgaz.me>
+---
+ sound/soc/codecs/wm8960.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sound/soc/codecs/wm8960.c b/sound/soc/codecs/wm8960.c
+index 78714c1b99bb..70e106931fa6 100644
+--- a/sound/soc/codecs/wm8960.c
++++ b/sound/soc/codecs/wm8960.c
+@@ -1720,3 +1720,4 @@ module_i2c_driver(wm8960_i2c_driver);
+ 
+ MODULE_DESCRIPTION("ASoC WM8960 driver");
+ MODULE_AUTHOR("Liam Girdwood");
++MODULE_LICENSE("GPL v2");
+-- 
+2.44.1
+
