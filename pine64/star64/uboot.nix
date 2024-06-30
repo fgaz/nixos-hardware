@@ -10,6 +10,8 @@ buildUBoot rec {
     hash = "sha256-UBPTLbSjDdL6NPUrAdsWcL28QSyiY/5oA+iqxl9dEGY=";
   };
 
+  patches = [];
+
   defconfig = "pine64_star64_defconfig";
   filesToInstall = [
     "u-boot.bin"
