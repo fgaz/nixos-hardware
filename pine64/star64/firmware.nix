@@ -1,86 +1,75 @@
-{ callPackage, pkgsBuildHost, writeText, writeShellApplication
-, stdenv, dtc, mtdutils, coreutils }:
+{ config, pkgs, lib, ... }:
 let
-  uboot = callPackage ./uboot.nix { };
-  opensbi = callPackage ./opensbi.nix {
-    withPayload = "${uboot}/u-boot.bin";
-    withFDT = "${uboot}/pine64_star64.dtb";
-  };
-  spl-tool = pkgsBuildHost.callPackage ./spl-tool.nix { };
-  its-file = writeText "star64-uboot-fit-image.its" ''
-    /dts-v1/;
-
-    / {
-      description = "U-boot-spl FIT image for JH7110 Star64";
-      #address-cells = <2>;
-
-      images {
-        firmware {
-          description = "u-boot";
-          data = /incbin/("${opensbi}/share/opensbi/lp64/generic/firmware/fw_payload.bin");
-          type = "firmware";
-          arch = "riscv";
-          os = "u-boot";
-          load = <0x0 0x40000000>;
-          entry = <0x0 0x40000000>;
-          compression = "none";
+  cfg = config.hardware.star64;
+in
+{
+  options = {
+    hardware.star64 = {
+      opensbi = {
+        src = lib.mkOption {
+          description = "OpenSBI source";
+          type = lib.types.nullOr lib.types.package;
+          default = null;
+        };
+        patches = lib.mkOption {
+          description = "List of patches to apply to the OpenSBI source";
+          type = lib.types.nullOr (lib.types.listOf lib.types.package);
+          default = null;
         };
       };
-
-      configurations {
-        default = "config-1";
-
-        config-1 {
-          description = "U-boot-spl FIT config for JH7110 Star64";
-          firmware = "firmware";
+      uboot = {
+        src = lib.mkOption {
+          description = "U-boot source";
+          type = lib.types.nullOr lib.types.package;
+          default = null;
+        };
+        patches = lib.mkOption {
+          description = "List of patches to apply to the U-boot source";
+          type = lib.types.nullOr (lib.types.listOf lib.types.package);
+          default = null;
         };
       };
     };
-  '';
-in rec {
-  inherit opensbi uboot;
-  spl = stdenv.mkDerivation {
-    name = "pine64-star64-spl";
-    depsBuildBuild = [ spl-tool ];
-    phases = [ "installPhase" ];
-    installPhase = ''
-      mkdir -p $out/share/pine64-star64/
-      ln -s ${uboot}/u-boot-spl.bin .
-      spl_tool -c -f ./u-boot-spl.bin
-      cp u-boot-spl.bin.normal.out $out/share/pine64-star64/spl.bin
-    '';
   };
-  uboot-fit-image = stdenv.mkDerivation {
-    name = "pine64-star64-uboot-fit-image";
-    nativeBuildInputs = [ dtc ];
-    phases = [ "installPhase" ];
-    installPhase = ''
-      mkdir -p $out/share/pine64-star64/
-      ${uboot}/mkimage -f ${its-file} -A riscv -O u-boot -T firmware $out/share/pine64-star64/star64_fw_payload.img
-    '';
-  };
-  updater-flash = writeShellApplication {
-    name = "star64-firmware-update-flash";
-    runtimeInputs = [ mtdutils ];
-    text = ''
-      flashcp -v ${spl}/share/pine64-star64/spl.bin /dev/mtd0
-      flashcp -v ${uboot-fit-image}/share/pine64-star64/star64_fw_payload.img /dev/mtd1
-    '';
-  };
-  updater-mmc = writeShellApplication {
-    name = "star64-firmware-update-mmc";
-    runtimeInputs = [ ];
-    text = ''
-      dd if=${spl}/share/pine64-star64/spl.bin of=/dev/mmcblk0p1 conv=fsync
-      dd if=${uboot-fit-image}/share/pine64-star64/star64_fw_payload.img of=/dev/mmcblk0p2 conv=fsync
-    '';
-  };
-  updater-sd = writeShellApplication {
-    name = "star64-firmware-update-sd";
-    runtimeInputs = [ ];
-    text = ''
-      dd if=${spl}/share/pine64-star64/spl.bin of=/dev/mmcblk1p1 conv=fsync
-      dd if=${uboot-fit-image}/share/pine64-star64/star64_fw_payload.img of=/dev/mmcblk1p2 conv=fsync
-    '';
+
+  config = {
+    system.build = {
+      opensbi = (pkgs.callPackage ./opensbi.nix {}).overrideAttrs (f: p: {
+        src = if cfg.opensbi.src != null then cfg.opensbi.src else p.src;
+        patches = if cfg.opensbi.patches != null then cfg.opensbi.patches else (p.patches or []);
+      });
+
+      uboot = (pkgs.callPackage ./uboot.nix { inherit (config.system.build) opensbi; }).overrideAttrs (f: p: {
+        src = if cfg.uboot.src != null then cfg.uboot.src else p.src;
+        patches = if cfg.uboot.patches != null then cfg.uboot.patches else (p.patches or []);
+      });
+
+      updater-flash = pkgs.writeShellApplication {
+        name = "star64-firmware-update-flash";
+        runtimeInputs = [ pkgs.mtdutils ];
+        text = ''
+          flashcp -v ${config.system.build.uboot}/u-boot-spl.bin.normal.out /dev/mtd0
+          flashcp -v ${config.system.build.uboot}/u-boot.itb /dev/mtd1
+        '';
+      };
+
+      updater-mmc = pkgs.writeShellApplication {
+        name = "star64-firmware-update-mmc";
+        runtimeInputs = [ ];
+        text = ''
+          dd if=${config.system.build.uboot}/u-boot-spl.bin.normal.out of=/dev/mmcblk0p1 conv=fsync
+          dd if=${config.system.build.uboot}/u-boot.itb of=/dev/mmcblk0p2 conv=fsync
+        '';
+      };
+
+      updater-sd = pkgs.writeShellApplication {
+        name = "star64-firmware-update-sd";
+        runtimeInputs = [ ];
+        text = ''
+          dd if=${config.system.build.uboot}/u-boot-spl.bin.normal.out of=/dev/mmcblk1p1 conv=fsync
+          dd if=${config.system.build.uboot}/u-boot.itb of=/dev/mmcblk1p2 conv=fsync
+        '';
+      };
+    };
   };
 }

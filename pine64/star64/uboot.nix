@@ -1,20 +1,27 @@
-{ fetchFromGitHub, buildUBoot }:
+{ fetchFromGitLab
+, buildUBoot
+, opensbi
+}:
 
-buildUBoot rec {
-  version = "3.0.4";
+buildUBoot {
+  version = "2025.01-unstable-2025-03-25";
 
-  src = fetchFromGitHub {
-    owner = "Fishwaldo";
+  src = fetchFromGitLab {
+    domain = "source.denx.de";
+    owner = "u-boot";
     repo = "u-boot";
-    rev = "172b47f62039605d6806fa96bd403c21cda28996"; # Star64 branch
-    hash = "sha256-UBPTLbSjDdL6NPUrAdsWcL28QSyiY/5oA+iqxl9dEGY=";
+    rev = "3962acf0a492fb3dbf1d3780a7c7367a7b25b065";
+    hash = "sha256-TigOmE9engN7Hs6v+ucwUM1Ju9j/8E3gPvll4cXSFg8=";
   };
 
-  defconfig = "pine64_star64_defconfig";
+  extraMakeFlags = [
+    "OPENSBI=${opensbi}/share/opensbi/lp64/generic/firmware/fw_dynamic.bin"
+  ];
+
+  defconfig = "starfive_visionfive2_defconfig";
+
   filesToInstall = [
-    "u-boot.bin"
-    "arch/riscv/dts/pine64_star64.dtb"
-    "spl/u-boot-spl.bin"
-    "tools/mkimage"
+    "spl/u-boot-spl.bin.normal.out"
+    "u-boot.itb"
   ];
 }
